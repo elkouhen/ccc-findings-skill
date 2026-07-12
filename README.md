@@ -11,6 +11,16 @@ automatically by the agent.
 - [`skills/cccf/references/management.md`](skills/cccf/references/management.md) —
   installation, initialization, daemon management, troubleshooting.
 
+## Installation
+
+```bash
+npx skills add elkouhen/ccc-findings-skill
+```
+
+This installs the `cccf` skill (`skills/cccf/`) for your coding agent. It
+still requires the `cccf` CLI itself — see
+[Installation in `ccc-findings`](https://github.com/elkouhen/ccc-findings#installation).
+
 ## Related projects
 
 - [`ccc-findings`](https://github.com/elkouhen/ccc-findings) (`cccf`) — the

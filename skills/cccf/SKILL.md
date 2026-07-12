@@ -1,5 +1,5 @@
 ---
-name: cccff
+name: cccf
 description: "This skill should be used when code search is needed (whether explicitly requested or as part of completing a task), when indexing the codebase after changes, or when the user asks about cccf, cocoindex-code, or the codebase index. Trigger phrases include 'search the codebase', 'find code related to', 'update the index', 'cccf', 'cocoindex-code'. It returns Semgrep findings."
 ---
 
