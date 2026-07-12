@@ -1,5 +1,9 @@
 # ccc Settings
 
+> Copied unmodified from cocoindex-code's
+> [`skills/ccc/references/settings.md`](https://github.com/cocoindex-io/cocoindex-code/blob/main/skills/ccc/references/settings.md)
+> (Apache-2.0) — these are `ccc`'s own settings, which `cccf` relies on unchanged.
+
 Configuration lives in two YAML files, both created automatically by `ccc init`.
 
 ## User-Level Settings (`~/.cocoindex_code/global_settings.yml`)

@@ -1,5 +1,9 @@
 # ccc Management
 
+> Copied unmodified from cocoindex-code's
+> [`skills/ccc/references/management.md`](https://github.com/cocoindex-io/cocoindex-code/blob/main/skills/ccc/references/management.md)
+> (Apache-2.0) — these are `ccc`'s own management commands, which `cccf` relies on unchanged.
+
 ## Installation
 
 Install CocoIndex Code via pipx. Two install styles:

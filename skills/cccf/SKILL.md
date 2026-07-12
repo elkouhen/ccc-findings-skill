@@ -3,6 +3,10 @@ name: cccff
 description: "This skill should be used when code search is needed (whether explicitly requested or as part of completing a task), when indexing the codebase after changes, or when the user asks about cccf, cocoindex-code, or the codebase index. Trigger phrases include 'search the codebase', 'find code related to', 'update the index', 'cccf', 'cocoindex-code'. It returns Semgrep findings."
 ---
 
+> Adapted from cocoindex-code's own skill
+> ([`skills/ccc/SKILL.md`](https://github.com/cocoindex-io/cocoindex-code/blob/main/skills/ccc/SKILL.md),
+> Apache-2.0), renamed to `cccf` and extended to cover Semgrep findings.
+
 # cccf - Semantic Code Search & Indexing
 
 `cccf` is the CLI for CocoIndex Code, providing semantic search over the current codebase and index management.

@@ -18,8 +18,18 @@ automatically by the agent.
   and joins them to code search results from `ccc`.
 - [`cocoindex-code`](https://github.com/cocoindex-io/cocoindex-code) (`ccc`)
   — the underlying AST-based semantic code search tool that `cccf` extends
-  as a companion package (no fork, no internal import — see `ccc-findings`'s
-  ADR-1).
+  as a companion package (no fork, no internal import at the CLI/MCP level —
+  see `ccc-findings`'s ADR-1).
+
+## Provenance
+
+This skill started as an adaptation of cocoindex-code's own
+[`skills/ccc/`](https://github.com/cocoindex-io/cocoindex-code/tree/main/skills/ccc)
+skill (Apache-2.0): `SKILL.md` is renamed to `cccf` and extended to cover
+Semgrep findings, while `references/settings.md` and
+`references/management.md` are carried over unmodified since they document
+`ccc` itself, which `cccf` relies on unchanged. Each file links back to its
+source. See [LICENSE](LICENSE) for the terms this carries over.
 
 ## License
 
