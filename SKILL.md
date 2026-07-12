@@ -1,6 +1,6 @@
 ---
 name: cccf
-description: Query and fix a repository's security/quality debt through the ccc-findings Semgrep index. Triggers — vulnerability, security, semgrep, finding, debt, audit.
+description: "This skill should be used when code search is needed and known security/quality debt should be surfaced alongside it (whether explicitly requested or as part of completing a task), when checking a file or vulnerability class before editing, or when the user asks about cccf, ccc-findings, Semgrep findings, or security debt. It is a superset of ccc on the query side: `search_code_with_findings` / `cccf search` return the same results as `ccc search`, each annotated with overlapping Semgrep findings and ranked with severity. Trigger phrases include 'search the codebase' (debt-aware), 'vulnerability', 'security', 'semgrep', 'finding', 'debt', 'audit'."
 ---
 
 # ccc-findings (cccf)
@@ -8,6 +8,19 @@ description: Query and fix a repository's security/quality debt through the ccc-
 Local Semgrep index, searchable in natural language and joined with code through
 `ccc`. This skill helps the agent answer quickly, with little noise, without
 rerunning a full scan every time a security question appears.
+
+`cccf` is a superset of `ccc` on the query side: `search_code_with_findings`
+(MCP) and `cccf search` (CLI) return the same results as `ccc search`, in the
+same format, with each result annotated by the Semgrep findings that overlap
+it and ranked with severity taken into account.
+
+On the indexing side, `cccf index --engine cocoindex` (experimental, opt-in)
+extends the `cocoindex` Python library instead of only shelling out to `ccc`:
+it builds a local `code_chunks` + embeddings index in the same SQLite store
+as `findings.db`, which `cccf search` then queries directly before falling
+back to `ccc search`. The default engine (`--engine manual`) is unchanged and
+does not depend on `cocoindex`. See [Extending `cocoindex`](#extending-cocoindex--engine-cocoindex)
+below.
 
 ## UX golden rule
 
@@ -87,6 +100,7 @@ they respond; if not, run the steps below yourself (or ask the user to).
                             # otherwise use --rules <path-or-pack>, or falls
                             # back automatically to the p/security-audit pack
    cccf index
+   cccf index --engine cocoindex   # optional: see "Extending cocoindex" below
    ```
 5. **Register both required MCP servers** with the client (for example
    `.mcp.json` at the project root for Claude Code, or your client's
@@ -105,6 +119,11 @@ they respond; if not, run the steps below yourself (or ask the user to).
    verification step is simply skipped: `reindex_findings` + `search_findings`
    (steps 5-6 of Workflow 3) are enough to confirm a finding disappeared,
    with lower confidence than a fresh scan.
+
+**After upgrading `cccf`**: databases created by an older version migrate
+automatically on first open (embeddings moved to a sqlite-vec table), which
+clears stored embeddings — run `cccf index` once after upgrading; it re-embeds
+everything transparently.
 
 ## Configure the Semgrep rules to analyze
 
@@ -145,6 +164,41 @@ from the CLI instead; there is no MCP `--full` equivalent.
 database among the findings discovered by the rules. It is independent from the
 choice of rules themselves.
 
+## Extending `cocoindex` — `--engine cocoindex`
+
+`cccf index --engine cocoindex` is the only place this skill depends on the
+`cocoindex` library rather than treating `ccc` as an opaque subprocess. It
+indexes the same source files `ccc` sees, chunks and embeds them, and stores
+the result as `code_chunks`/`vec_code_chunks` in `.cccf/findings.db` — so
+`cccf search` can query that local index first (`vec_code_chunks`) and skip
+`ccc search`'s text-parsing fallback. The default engine (`--engine manual`)
+only indexes findings and is unaffected.
+
+This skill carries its own copy of the `cocoindex` skill's `references/`
+(not a live link) so an agent building, debugging, or extending this engine
+does not need the `cocoindex` skill installed separately:
+
+- [references/api_reference.md](references/api_reference.md) — `@coco.fn`,
+  `mount`/`mount_each`, `ContextKey` — the primitives the chunk+embedding
+  pipeline is built from.
+- [references/patterns.md](references/patterns.md) — Pattern 2 (Vector
+  Embedding Pipeline) is the closest match to what `--engine cocoindex` does
+  internally (chunk → embed → declare row).
+- [references/setup_database.md](references/setup_database.md) — the SQLite
+  + sqlite-vec section; `cccf` already uses this store for `findings.db`,
+  this engine adds `code_chunks` to the same file.
+- [references/connectors.md](references/connectors.md) — the `localfs`
+  source connector, used to walk the same source tree as `ccc`.
+- [references/setup_project.md](references/setup_project.md) — background
+  only; `cccf` does not scaffold a project the way `cocoindex init` does, it
+  embeds the pipeline directly.
+
+Do not confuse this with `ccc` (`cocoindex-code`): `ccc` is a separate CLI
+built on the same `cocoindex` primitives; `cccf` still shells out to it as a
+subprocess for the default engine and does not import its internal code.
+`--engine cocoindex` only reduces reliance on that subprocess for search — it
+does not replace `ccc index`.
+
 ## Reference workflows
 
 ### Workflow 1 — Explore known issues
@@ -179,8 +233,26 @@ choice of rules themselves.
 ## Cross-search code + findings
 
 To explore code while accounting for its security debt, prefer
-`search_code_with_findings(query="...")` over a plain `ccc` search: it annotates
-each code result with known Semgrep findings that overlap it.
+`search_code_with_findings(query="...")` over a plain `ccc` search: it returns
+the same results as `ccc search`, annotates each one with the known Semgrep
+findings that overlap it, and ranks results with a small severity boost — a
+slightly less relevant chunk carrying an ERROR finding is promoted above a
+finding-free one of similar relevance. The reported `score` stays ccc's raw
+semantic score; only the ordering accounts for severity.
+
+The result is a single stable object whatever the environment provides:
+
+- `results`: annotated code hits (nominal case). Empty if `ccc` is unavailable.
+- `findings_only_fallback`: findings-only search results, populated only when
+  `ccc` is unavailable — the analysis can continue from these.
+- `warning`: `null` nominally; a short explanation in degraded modes
+  (`ccc` unavailable, or findings index missing — in the latter case `results`
+  are returned without findings annotations and the fix is `cccf index`).
+
+The CLI equivalent is `cccf search "<query>"` (same behavior, shared
+implementation); `cccf findings "<query>"` is the CLI equivalent of
+`search_findings` (findings-only, with `--severity/--rule/--path` filters).
+Use the CLI forms when the MCP server is not registered.
 
 ## Anti-patterns
 
@@ -194,8 +266,12 @@ each code result with known Semgrep findings that overlap it.
   decision about a false positive.
 - Do not display the raw JSON response unless the user explicitly asks for JSON:
   turn results into an actionable summary.
-- Do not block if `ccc` is unavailable: `search_code_with_findings` returns a
-  findings fallback that can be used to continue the analysis.
+- Do not block if `ccc` is unavailable: `search_code_with_findings` fills
+  `findings_only_fallback` (with a `warning`) so the analysis can continue.
+- Do not parse tool responses for an `"error"` key: failures now surface as
+  MCP tool errors (`isError: true`) with an actionable message. In particular,
+  `Index absent. Lancez d'abord: cccf index` means the repo is not indexed yet —
+  run the Installation steps (`cccf init` then `cccf index`) instead of retrying.
 
 ## Recommended response format
 
