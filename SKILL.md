@@ -62,6 +62,8 @@ When the request asks for a fix:
 
 ## Installation
 
+0. **This skill**: `npx skills add https://github.com/elkouhen/cocoindex-ext-skill`
+   (mono-skill repo — installs `cccf` directly, no `--skill` flag needed).
 1. **Semgrep** (required by `cccf`): `pipx install semgrep` or
    `brew install semgrep`.
 2. **cccf**: not published on PyPI — install from source:
