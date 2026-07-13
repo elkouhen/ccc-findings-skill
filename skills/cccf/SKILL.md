@@ -1,15 +1,23 @@
 ---
 name: cccf
-description: "This skill should be used when code search is needed (whether explicitly requested or as part of completing a task), when indexing the codebase after changes, when looking up Semgrep findings (vulnerabilities, security issues, technical debt, a specific rule or finding), or when the user asks about cccf, cocoindex-code, or the codebase index. Trigger phrases include 'search the codebase', 'find code related to', 'update the index', 'cccf', 'cocoindex-code', 'vulnerability', 'security issue', 'semgrep', 'finding', 'technical debt', 'audit'. It returns Semgrep findings alongside code search results, or on their own via 'cccf findings'."
+description: "This skill should be used for Java/Spring/Maven microservice audits with cccf: initializing the repo with the right Semgrep packs, indexing findings plus REST/Kafka endpoints, inspecting summary/endpoints/graph/findings, or running code search via ccc when needed. Trigger phrases include 'audit', 'microservice', 'Kafka', 'REST', 'cccf', 'Semgrep', 'finding', 'endpoint', 'graph', and 'search the codebase'."
 ---
 
 > Adapted from cocoindex-code's own skill
 > ([`skills/ccc/SKILL.md`](https://github.com/cocoindex-io/cocoindex-code/blob/main/skills/ccc/SKILL.md),
 > Apache-2.0), renamed to `cccf` and extended to cover Semgrep findings.
 
-# cccf - Semantic Code Search, Indexing & Semgrep Findings
+# cccf - Microservice Audit, Indexing & Findings
 
-`cccf` is the CLI for CocoIndex Code extended with Semgrep findings: semantic search over the current codebase, index management, and natural-language lookup of indexed Semgrep findings (vulnerabilities, security issues, technical debt).
+`cccf` is the audit CLI layered on top of Semgrep and, for code search only,
+`ccc` (CocoIndex Code). For the target stack of this skill — **Java + Spring +
+Maven microservices** — it indexes:
+
+- Semgrep findings (`cccf summary`, `cccf findings`)
+- REST and Kafka endpoints (`cccf endpoints`)
+- derived blocking signals such as outbound REST calls inside Kafka consumers
+  (`cccf graph`)
+- code search results enriched with findings (`cccf search`, via `ccc`)
 
 ## Ownership
 
@@ -19,9 +27,9 @@ The agent owns the `cccf` lifecycle for the current project — initialization, 
 - **Index freshness**: Keep the index up to date by running `cccf index` (or `cccf search --refresh`) when the index may be stale — e.g., at the start of a session, or after making significant code changes (new files, refactors, renamed modules). There is no need to re-index between consecutive searches if no code was changed in between.
 - **Installation**: If `cccf` itself is not found (command not found), refer to [management.md](references/management.md) for installation instructions and inform the user.
 
-### Default Rules
+### Default Rules for Java Microservice Audits
 
-This skill bundles two Semgrep rule packs:
+This skill bundles four Semgrep rule packs:
 
 - `default` ([`rules/default/`](rules/default/)) — Java rules for bounded,
   streaming-safe handling of files and Kafka events: bounded streaming for
@@ -39,13 +47,20 @@ This skill bundles two Semgrep rule packs:
   inside a Kafka consumer handler, and a network call held under a lock —
   Java/Spring only (`java.yaml`: `RestTemplate`, `@KafkaListener`,
   `synchronized`), matching the target stack (Java + Spring + Maven).
+- `rest` ([`rules/rest/`](rules/rest/)) — REST endpoint inventory rules for
+  Spring controllers and `RestTemplate` client calls. These do **not** create
+  findings; they populate `cccf endpoints` / `cccf graph`.
+- `kafka` ([`rules/kafka/`](rules/kafka/)) — Kafka endpoint inventory rules
+  for `@KafkaListener`, `KafkaTemplate.send(...)`, and `ProducerRecord(...)`.
+  These also feed `cccf endpoints` / `cccf graph`, not the findings list.
 
-Run all files from both packs **by default** on `cccf init`, unless the
-user explicitly asks for a different rule set:
+Run all four packs **by default** on `cccf init`, unless the user explicitly
+asks for a different rule set:
 
 1. If `.cccf/config.yml` doesn't exist yet, copy the pack directories
-   (`rules/default/`, `rules/liveness/`) into the target repo (e.g.
-   `.cccf/rules/default/`, `.cccf/rules/liveness/`) — never pass an
+   (`rules/default/`, `rules/liveness/`, `rules/rest/`, `rules/kafka/`) into
+   the target repo (e.g. `.cccf/rules/default/`, `.cccf/rules/liveness/`,
+   `.cccf/rules/rest/`, `.cccf/rules/kafka/`) — never pass an
    absolute path back into the skill's own directory, since Semgrep derives
    rule identity from the `--config` path and an absolute path outside the
    repo breaks reproducibility across machines/checkouts.
@@ -54,7 +69,9 @@ user explicitly asks for a different rule set:
    cccf init \
      --rules .cccf/rules/default/a-memoire-fichiers.yaml \
      --rules .cccf/rules/default/b-kafka.yaml \
-     --rules .cccf/rules/liveness/java.yaml
+     --rules .cccf/rules/liveness/java.yaml \
+     --rules .cccf/rules/rest/java.yaml \
+     --rules .cccf/rules/kafka/java.yaml
    ```
    This takes priority over `cccf init`'s own auto-detection (local
    `.semgrep.yml`/`semgrep.yml`/`.semgrep`, or the `p/security-audit`
@@ -64,6 +81,24 @@ user explicitly asks for a different rule set:
    asks to replace them.
 4. If `.cccf/config.yml` already exists, leave it as-is (`cccf init` refuses
    to overwrite it) — the default packs only apply to fresh initialization.
+
+## Audit Workflow
+
+For microservice audits, prefer the following sequence:
+
+1. `cccf summary` — quick posture: severity distribution and hot rules.
+2. `cccf endpoints` — inspect the static REST/Kafka inventory.
+3. `cccf graph` — look for outbound REST calls inside Kafka consumers first;
+   use it before diving into individual findings when the symptom is
+   distributed blocking or intermittent lock-up.
+4. `cccf findings <query>` — search vulnerabilities / technical debt by
+   description or rule.
+5. `cccf search <query>` — only when you need semantic code search; this is
+   the part that depends on `ccc`.
+
+Do not jump straight to `cccf search` for every audit question: `summary`,
+`endpoints`, `graph`, and `findings` are cheaper and more directly aligned with
+architecture review.
 
 ## Searching the Codebase
 
@@ -160,9 +195,10 @@ question isn't about a specific file, rule, or vulnerability class. Add
 Prefer the least expensive query that answers the question, escalating only
 as needed:
 
-1. **Overview** — `cccf summary` for a short state of the repo.
-2. **Targeted findings lookup** — `cccf findings <query>` for a specific problem, rule, or file.
-3. **Code + findings** — `cccf search <query>` when the question is primarily about code, with findings as enrichment.
+1. **Architecture overview** — `cccf summary`, then `cccf endpoints`.
+2. **Distributed blocking suspicion** — `cccf graph`.
+3. **Targeted findings lookup** — `cccf findings <query>`.
+4. **Code + findings** — `cccf search <query>` when the question is primarily about code semantics.
 
 If `.cccf/findings.db` doesn't exist yet, both `cccf findings` and `cccf summary` exit with `Index absent. Lancez d'abord: cccf index` (exit code 2) — run `cccf index` and retry, same as the index-freshness rule under Ownership above.
 

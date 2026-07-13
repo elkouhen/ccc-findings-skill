@@ -1,114 +1,60 @@
-# ccc Management
+# cccf Management
 
-> Copied unmodified from cocoindex-code's
-> [`skills/ccc/references/management.md`](https://github.com/cocoindex-io/cocoindex-code/blob/main/skills/ccc/references/management.md)
-> (Apache-2.0) — these are `ccc`'s own management commands, which `cccf` relies on unchanged.
+`cccf` depends on three executables for the full workflow:
+
+- `cccf` — findings / endpoints / graph / MCP
+- `semgrep` — scan engine used by `cccf index`
+- `ccc` — semantic code search used by `cccf search`
 
 ## Installation
 
-Install CocoIndex Code via pipx. Two install styles:
+Install all three when the environment is missing them:
 
 ```bash
-pipx install 'cocoindex-code[full]'      # batteries included (local embeddings via sentence-transformers)
-pipx install cocoindex-code              # slim (LiteLLM-only; requires a cloud embedding provider + API key)
+uv tool install ccc-findings
+uv tool install cocoindex-code
+pipx install semgrep
 ```
 
-The `[full]` extra pulls in `sentence-transformers` so the first-run default (local embeddings, no API key) works out of the box. The slim install is for environments where you don't want the torch/transformers deps and plan to use a LiteLLM-supported cloud provider instead.
-
-To upgrade to the latest version:
-
-```bash
-pipx upgrade cocoindex-code
-```
-
-After installation, the `ccc` command is available globally.
+`cccf search` is the only command that requires `ccc`; `cccf summary`,
+`cccf endpoints`, `cccf graph`, `cccf findings`, and `cccf index` do not.
 
 ## Project Initialization
 
-Run from the root directory of the project to index:
+For the Java/Spring/Maven audit workflow owned by this skill:
+
+1. Copy the local rule packs into the target repo under `.cccf/rules/`.
+2. Run `cccf init` with explicit `--rules` for `default`, `liveness`, `rest`,
+   and `kafka`.
+3. Run `cccf index`.
+
+Example:
 
 ```bash
-ccc init
+cccf init \
+  --rules .cccf/rules/default/a-memoire-fichiers.yaml \
+  --rules .cccf/rules/default/b-kafka.yaml \
+  --rules .cccf/rules/liveness/java.yaml \
+  --rules .cccf/rules/rest/java.yaml \
+  --rules .cccf/rules/kafka/java.yaml
+cccf index
 ```
 
-**First run (global settings don't exist yet)** — `ccc init` prompts interactively for the embedding provider (sentence-transformers / litellm) and model, then runs a one-off test embed via the daemon to confirm the model works. Accept the defaults for the sentence-transformers path, or pick litellm and enter a model identifier.
+If `.cccf/config.yml` already exists, do not recreate it silently; reuse it.
 
-**Subsequent runs** (global settings already exist) — prompts are skipped; only project settings and `.gitignore` are set up.
+## Refreshing the Index
 
-To skip the interactive prompts on the first run (e.g. in a script or container), pass `--litellm-model MODEL`:
-
-```bash
-ccc init --litellm-model openai/text-embedding-3-small
-```
-
-This is also the only way to pick a LiteLLM model when stdin isn't a TTY and you've done a slim install.
-
-`ccc init` creates:
-- `~/.cocoindex_code/global_settings.yml` (user-level, embedding config + env vars).
-- `.cocoindex_code/settings.yml` (project-level, include/exclude patterns).
-
-If `.git` exists in the directory, `.cocoindex_code/` is automatically added to `.gitignore`.
-
-Use `-f` to skip the confirmation prompt if `ccc init` detects a potential parent project root.
-
-After initialization, edit the settings files if needed (see [settings.md](settings.md) for format details), then run `ccc index` to build the initial index. If the model test printed `[FAIL]` during `init`, edit `global_settings.yml` (and optionally add API keys under the commented `envs:` block) and verify with `ccc doctor` before indexing.
+- After code changes: run `cccf index`.
+- After asking architecture-level questions: prefer `cccf summary`,
+  `cccf endpoints`, `cccf graph`, or `cccf findings` before `cccf search`.
+- After major refactors that affect code search too: refresh `cccf index`, then
+  use `cccf search`.
 
 ## Troubleshooting
 
-### Diagnostics
-
-Run `ccc doctor` to check system health end-to-end:
-
-```bash
-ccc doctor
-```
-
-This checks global settings, daemon status, embedding model (runs a test embedding), and — if run from within a project — file matching (walks files using the same logic as the indexer) and index status. Results stream incrementally. Always points to `daemon.log` at the end for further investigation.
-
-### Checking Project Status
-
-To view the current project's index status:
-
-```bash
-ccc status
-```
-
-This shows whether indexing is ongoing and index statistics.
-
-### Daemon Management
-
-The daemon starts automatically on first use. To check its status:
-
-```bash
-ccc daemon status
-```
-
-This shows whether the daemon is running, its version, uptime, and loaded projects.
-
-To restart the daemon (useful if it gets into a bad state):
-
-```bash
-ccc daemon restart
-```
-
-To stop the daemon:
-
-```bash
-ccc daemon stop
-```
-
-## Cleanup
-
-To reset a project's index (removes databases, keeps settings):
-
-```bash
-ccc reset
-```
-
-To fully remove all CocoIndex Code data for a project (including settings):
-
-```bash
-ccc reset --all
-```
-
-Both commands prompt for confirmation. Use `-f` to skip.
+- `cccf` missing: install `ccc-findings`.
+- `semgrep` missing: install `semgrep`.
+- `ccc` missing: install `cocoindex-code`; only blocks `cccf search`.
+- `Index absent. Lancez d'abord: cccf index`: initialize/configure the repo,
+  then run `cccf index`.
+- Embedding signature / dimension mismatch: re-run `cccf index --full`.
