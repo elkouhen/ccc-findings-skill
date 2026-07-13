@@ -10,6 +10,11 @@ automatically by the agent.
   embedding model, include/exclude patterns, language overrides.
 - [`skills/cccf/references/management.md`](skills/cccf/references/management.md) —
   installation, initialization, daemon management, troubleshooting.
+- [`skills/cccf/rules/default/`](skills/cccf/rules/default/) — bundled
+  Semgrep rule pack (Java) for bounded file streaming, Kafka
+  claim-check/delivery guarantees, object storage as source of truth, and
+  safe PDF/archive handling, run by default on `cccf init` (see
+  **Default Rules** in `SKILL.md`).
 
 ## Installation
 
