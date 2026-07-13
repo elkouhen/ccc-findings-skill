@@ -17,6 +17,8 @@ Maven microservices** — it indexes:
 - REST and Kafka endpoints (`cccf endpoints`)
 - derived blocking signals such as outbound REST calls inside Kafka consumers
   (`cccf graph`)
+- who produces/consumes a given topic or route, across services
+  (`cccf flow`)
 - code search results enriched with findings (`cccf search`, via `ccc`)
 
 ## Ownership
@@ -99,15 +101,42 @@ For microservice audits, prefer the following sequence:
 2. `cccf endpoints` — inspect the static REST/Kafka inventory.
 3. `cccf graph` — look for outbound REST calls inside Kafka consumers first;
    use it before diving into individual findings when the symptom is
-   distributed blocking or intermittent lock-up.
-4. `cccf findings <query>` — search vulnerabilities / technical debt by
+   distributed blocking or intermittent lock-up. With `--workspace <root>`
+   (a parent directory containing several Maven microservices/modules,
+   read-only, see `cccf workspace`), also reports real cross-service cycles
+   and hotspots instead of an empty result.
+4. `cccf flow <topic-or-route>` — once `graph` (or `endpoints`) surfaces a
+   topic or route of interest, trace every producer/consumer or
+   server/caller site for it, plus the findings that overlap each site.
+   Same `--workspace <root>` option to trace across services. Prefer this
+   over grepping the codebase for a topic name by hand.
+5. `cccf findings <query>` — search vulnerabilities / technical debt by
    description or rule.
-5. `cccf search <query>` — only when you need semantic code search; this is
+6. `cccf search <query>` — only when you need semantic code search; this is
    the part that depends on `ccc`.
 
 Do not jump straight to `cccf search` for every audit question: `summary`,
-`endpoints`, `graph`, and `findings` are cheaper and more directly aligned with
-architecture review.
+`endpoints`, `graph`, `flow`, and `findings` are cheaper and more directly
+aligned with architecture review.
+
+### Tracing a Flow (`cccf flow`)
+
+`cccf flow <query>` resolves `<query>` to a Kafka topic or REST route — exact
+name first, then an unambiguous case-insensitive substring — and lists every
+site for it (producers/consumers, or servers/callers) together with the
+Semgrep findings that overlap each site. A typical loop:
+
+```bash
+cccf flow orders.created                          # who produces/consumes this topic?
+cccf flow orders.created --workspace /path/to/root # same, across a multi-service directory
+```
+
+Then read the sites, fix the issue, `cccf index` (or the `reindex_findings`
+MCP tool) to refresh, and re-run `cccf flow` to confirm the finding is gone.
+A query that matches no topic/route, or matches more than one ambiguously,
+exits with an explicit error (code 2) rather than guessing — try a more
+specific query, or use `cccf endpoints`/`cccf graph` first to find the exact
+topic/route name.
 
 ## Searching the Codebase
 
