@@ -22,10 +22,14 @@ automatically by the agent.
   consumers, network calls under a lock — also run by default on
   `cccf init` (see **Default Rules** in `SKILL.md`).
 - [`skills/cccf/rules/rest/`](skills/cccf/rules/rest/) — bundled Semgrep
-  rule pack (Java) that inventories REST endpoints (Spring routes exposed,
-  `RestTemplate` call sites) for `cccf endpoints`/`cccf graph` — not a
-  findings pack, run by default on `cccf init` (see **Default Rules** in
-  `SKILL.md`; see `ccc-findings`'s `archive/BACKLOG-10.md` K11).
+  rule pack (Java) that inventories REST endpoints for `cccf
+  endpoints`/`cccf graph`: Spring routes exposed (`@GetMapping`/.../
+  `@RequestMapping` for any HTTP verb), `RestTemplate` call sites, Feign
+  declarative clients (`@FeignClient` interface methods, distinguished from
+  server routes by their missing method body), and `WebClient` fluent calls
+  (`.get().uri(...)`, ...) — not a findings pack, run by default on `cccf
+  init` (see **Default Rules** in `SKILL.md`; see `ccc-findings`'s
+  `archive/BACKLOG-10.md` K11).
 - [`skills/cccf/rules/kafka/`](skills/cccf/rules/kafka/) — bundled Semgrep
   rule pack (Java/Spring) that inventories Kafka producers/consumers
   (`@KafkaListener`, `KafkaTemplate.send`, `ProducerRecord`) for `cccf
