@@ -1,6 +1,6 @@
 ---
 name: cccr
-description: "This skill should be used for Java/Spring/Maven microservice audits with cccr: initializing the repo with the right Semgrep packs, indexing findings plus REST/Kafka endpoints, inspecting summary/endpoints/graph/findings, or running code search via ccc when needed. Trigger phrases include 'audit', 'microservice', 'Kafka', 'REST', 'cccr', 'Semgrep', 'finding', 'endpoint', 'graph', and 'search the codebase'."
+description: "This skill should be used for Java/Spring microservice audits with cccr: initializing the repo with the right Semgrep packs, indexing findings plus REST/Kafka endpoints, inspecting summary/endpoints/graph/findings, or running code search via ccc when needed. Trigger phrases include 'audit', 'microservice', 'Kafka', 'REST', 'cccr', 'Semgrep', 'finding', 'endpoint', 'graph', and 'search the codebase'."
 ---
 
 > Adapted from cocoindex-code's own skill
@@ -10,11 +10,12 @@ description: "This skill should be used for Java/Spring/Maven microservice audit
 # cccr - Microservice Audit, Indexing & Findings
 
 `cccr` is the audit CLI layered on top of Semgrep and, for code search only,
-`ccc` (CocoIndex Code). For the target stack of this skill — **Java + Spring +
-Maven microservices** — it indexes:
+`ccc` (CocoIndex Code). For the target stack of this skill — **Java + Spring
+microservices (Maven or Gradle)** — it indexes:
 
 - Semgrep findings (`cccr summary`, `cccr findings`)
-- REST and Kafka endpoints (`cccr endpoints`)
+- REST and Kafka endpoints (`cccr endpoints`), including Spring MVC, Feign,
+  WebClient, Spring Cloud Gateway, and WebFlux router functions
 - dependencies between microservices derived from REST/Kafka endpoints
   (`cccr graph`)
 - who produces/consumes a given topic or route, across services
@@ -48,7 +49,7 @@ This skill bundles five Semgrep rule packs:
   synchronous REST call
   inside a Kafka consumer handler, and a network call held under a lock —
   Java/Spring only (`java.yaml`: `RestTemplate`, `@KafkaListener`,
-  `synchronized`), matching the target stack (Java + Spring + Maven).
+  `synchronized`), matching the target stack (Java + Spring microservices).
 - `rest` ([`rules/rest/`](rules/rest/)) — REST endpoint inventory rules for
   Spring controllers and `RestTemplate` client calls. These do **not** create
   findings; they populate `cccr endpoints` / `cccr graph`.
@@ -100,7 +101,7 @@ For microservice audits, prefer the following sequence:
 2. `cccr endpoints` — inspect the static REST/Kafka inventory.
 3. `cccr graph` — surface the dependency topology between microservices from
    indexed REST/Kafka endpoints before diving into individual findings. For a
-   monorepo containing several Maven modules, indexing once at the parent
+   monorepo containing several Maven or Gradle modules, indexing once at the parent
    directory is enough: findings/endpoints are attributed to their module
    automatically, and `cccr graph` (no flag needed) reports real cross-module
    dependencies. Only use `--workspace <root>` when the services actually live
@@ -132,8 +133,8 @@ cccr flow orders.created --workspace /path/to/root # same, across separately-ind
 ```
 
 If the modules already share a single index (a monorepo indexed once at
-its root), `service` in the output already reflects each site's Maven
-module — no flag needed.
+its root), `service` in the output already reflects each site's module or
+service attribution — no flag needed.
 
 Then read the sites, fix the issue, `cccr index` (or the `reindex_findings`
 MCP tool) to refresh, and re-run `cccr flow` to confirm the finding is gone.
