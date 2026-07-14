@@ -44,8 +44,8 @@ This skill bundles five Semgrep rule packs:
   design-rules.md#rN` in each rule's metadata keeps resolving.
 - `liveness` ([`rules/liveness/`](rules/liveness/)) — cross-cutting rules
   for distributed-system blocking points in a REST + Kafka microservices
-  landscape (see `ccc-radar`'s `archive/BACKLOG-10.md` K8): missing HTTP
-  timeouts, blocking waits without a timeout, a synchronous REST call
+  landscape: missing HTTP timeouts, blocking waits without a timeout, a
+  synchronous REST call
   inside a Kafka consumer handler, and a network call held under a lock —
   Java/Spring only (`java.yaml`: `RestTemplate`, `@KafkaListener`,
   `synchronized`), matching the target stack (Java + Spring + Maven).
@@ -56,8 +56,7 @@ This skill bundles five Semgrep rule packs:
   for `@KafkaListener`, `KafkaTemplate.send(...)`, and `ProducerRecord(...)`.
   These also feed `cccr endpoints` / `cccr graph`, not the findings list.
 - `kafka-security` ([`rules/kafka-security/`](rules/kafka-security/)) —
-  Kafka security findings (see `ccc-radar`'s `archive/BACKLOG-10.md`
-  K8, security volet): SASL credentials hardcoded in source,
+  Kafka security findings: SASL credentials hardcoded in source,
   `security.protocol` set to `PLAINTEXT`, a `JsonDeserializer` trusting all
   packages (arbitrary class instantiation from an untrusted message), and
   raw Java deserialization (`ObjectInputStream.readObject`) — Java/Spring
@@ -272,7 +271,7 @@ as needed:
 
 1. **Architecture overview** — `cccr summary`, then `cccr endpoints`.
 2. **Microservice dependency overview** — `cccr graph`.
-3. **Targeted findings lookup** — `cccr findings <query>`.
+3. **Natural-language findings lookup** — `cccr findings <query>`.
 4. **Code + findings** — `cccr search <query>` when the question is primarily about code semantics.
 
 If `.cccr/findings.db` doesn't exist yet, both `cccr findings` and `cccr summary` exit with `Index absent. Lancez d'abord: cccr index` (exit code 2) — run `cccr index` and retry, same as the index-freshness rule under Ownership above.
@@ -283,4 +282,4 @@ To view or edit embedding model configuration, include/exclude patterns, or lang
 
 ## Management & Troubleshooting
 
-For installation, initialization, daemon management, troubleshooting, and cleanup commands, see [management.md](references/management.md).
+For installation, initialization, index refresh, troubleshooting, and cleanup commands, see [management.md](references/management.md).

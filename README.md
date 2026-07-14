@@ -9,7 +9,7 @@ automatically by the agent.
 - [`skills/cccr/references/settings.md`](skills/cccr/references/settings.md) —
   embedding model, include/exclude patterns, language overrides.
 - [`skills/cccr/references/management.md`](skills/cccr/references/management.md) —
-  installation, initialization, daemon management, troubleshooting.
+  installation, initialization, index refresh, troubleshooting.
 - [`skills/cccr/rules/default/`](skills/cccr/rules/default/) — bundled
   Semgrep rule pack (Java) for bounded file streaming and Kafka
   claim-check/delivery guarantees, run by default on `cccr init` (see
@@ -28,8 +28,7 @@ automatically by the agent.
   declarative clients (`@FeignClient` interface methods, distinguished from
   server routes by their missing method body), and `WebClient` fluent calls
   (`.get().uri(...)`, ...) — not a findings pack, run by default on `cccr
-  init` (see **Default Rules** in `SKILL.md`; see `ccc-radar`'s
-  `archive/BACKLOG-10.md` K11).
+  init` (see **Default Rules** in `SKILL.md`).
 - [`skills/cccr/rules/kafka/`](skills/cccr/rules/kafka/) — bundled Semgrep
   rule pack (Java/Spring, plus raw `kafka-clients`) that inventories Kafka
   producers/consumers (`@KafkaListener`, `KafkaTemplate.send`,
@@ -39,15 +38,12 @@ automatically by the agent.
   as Spring properties (`${app.kafka.topics.orders}`, including via a
   `@Value`-annotated field referenced by variable) against
   `application.yml`/`.properties` when present — not a findings pack, run
-  by default on `cccr init` (see
-  `ccc-radar`'s `archive/BACKLOG-10.md` K2, and `BACKLOG.md` Q25 for the
-  Kafka Streams rules).
+  by default on `cccr init` (see **Default Rules** in `SKILL.md`).
 - [`skills/cccr/rules/kafka-security/`](skills/cccr/rules/kafka-security/)
   — bundled Semgrep rule pack (Java/Spring) for Kafka security findings:
   hardcoded SASL credentials, `PLAINTEXT` security protocol, a
   `JsonDeserializer` trusting all packages, raw Java deserialization — run
-  by default on `cccr init` (see `ccc-radar`'s `archive/BACKLOG-10.md`
-  K8, security volet).
+  by default on `cccr init` (see **Default Rules** in `SKILL.md`).
 
 ## Installation
 
@@ -75,9 +71,9 @@ This skill started as an adaptation of cocoindex-code's own
 [`skills/ccc/`](https://github.com/cocoindex-io/cocoindex-code/tree/main/skills/ccc)
 skill (Apache-2.0): `SKILL.md` is renamed to `cccr` and extended to cover
 Semgrep findings, while `references/settings.md` and
-`references/management.md` are carried over unmodified since they document
-`ccc` itself, which `cccr` relies on unchanged. Each file links back to its
-source. See [LICENSE](LICENSE) for the terms this carries over.
+`references/management.md` stay close to the upstream material but are adapted
+where `cccr` adds its own workflow and defaults. Each file links back to its
+source where relevant. See [LICENSE](LICENSE) for the terms this carries over.
 
 ## License
 

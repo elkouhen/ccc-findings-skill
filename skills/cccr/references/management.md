@@ -25,7 +25,7 @@ For the Java/Spring/Maven audit workflow owned by this skill:
 
 1. Copy the local rule packs into the target repo under `.cccr/rules/`.
 2. Run `cccr init` with explicit `--rules` for `default`, `liveness`, `rest`,
-   and `kafka`.
+   `kafka`, and `kafka-security`.
 3. Run `cccr index`.
 
 Example:
@@ -36,7 +36,8 @@ cccr init \
   --rules .cccr/rules/default/b-kafka.yaml \
   --rules .cccr/rules/liveness/java.yaml \
   --rules .cccr/rules/rest/java.yaml \
-  --rules .cccr/rules/kafka/java.yaml
+  --rules .cccr/rules/kafka/java.yaml \
+  --rules .cccr/rules/kafka-security/java.yaml
 cccr index
 ```
 

@@ -13,6 +13,7 @@ rules:
   - .cccr/rules/liveness/java.yaml
   - .cccr/rules/rest/java.yaml
   - .cccr/rules/kafka/java.yaml
+  - .cccr/rules/kafka-security/java.yaml
 include:
   - "**/*"
 exclude:
