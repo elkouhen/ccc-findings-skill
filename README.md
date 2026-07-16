@@ -1,15 +1,15 @@
 # ccc-radar-skill
 
-Claude Code skill for `cccr` (CocoIndex Code + Semgrep findings): semantic
-code search, index management, and Semgrep findings lookup, driven
-automatically by the agent.
+Coding-agent skill for `cccr`: architecture exploration, Semgrep findings,
+index management, and optional semantic code search, driven automatically by
+the agent.
 
-- [`skills/cccr/SKILL.md`](skills/cccr/SKILL.md) — the skill itself:
-  ownership rules, searching, filtering, pagination.
+- [`skills/cccr/SKILL.md`](skills/cccr/SKILL.md) — ownership rules and the
+  architecture-first workflow.
 - [`skills/cccr/references/settings.md`](skills/cccr/references/settings.md) —
-  embedding model, include/exclude patterns, language overrides.
+  include/exclude patterns and optional `ccc` settings.
 - [`skills/cccr/references/management.md`](skills/cccr/references/management.md) —
-  installation, initialization, index refresh, troubleshooting.
+  installation, initialization, MCP setup, index refresh, and troubleshooting.
 - [`skills/cccr/rules/default/`](skills/cccr/rules/default/) — bundled
   Semgrep rule pack (Java) for bounded file streaming and Kafka
   claim-check/delivery guarantees, run by default on `cccr init` (see
@@ -22,8 +22,8 @@ automatically by the agent.
   consumers, network calls under a lock — also run by default on
   `cccr init` (see **Default Rules** in `SKILL.md`).
 - [`skills/cccr/rules/rest/`](skills/cccr/rules/rest/) — bundled Semgrep
-  rule pack (Java) that inventories REST endpoints for `cccr
-  endpoints`/`cccr graph`: Spring routes exposed (`@GetMapping`/.../
+  rule pack (Java) that inventories REST integrations for `cccr
+  integrations`/`cccr graph`: Spring routes exposed (`@GetMapping`/.../
   `@RequestMapping` for any HTTP verb), `RestTemplate` call sites, Feign
   declarative clients (`@FeignClient` interface methods, distinguished from
   server routes by their missing method body), and `WebClient` fluent calls
@@ -34,7 +34,7 @@ automatically by the agent.
   producers/consumers (`@KafkaListener`, `KafkaTemplate.send`,
   `ProducerRecord`, `KafkaConsumer.subscribe(...)` for non-Spring
   consumers, and `StreamsBuilder.stream(...)`/`KStream.to(...)` for Kafka
-  Streams) for `cccr endpoints`/`cccr graph`, resolving topic names given
+  Streams) for `cccr integrations`/`cccr graph`, resolving topic names given
   as Spring properties (`${app.kafka.topics.orders}`, including via a
   `@Value`-annotated field referenced by variable) against
   `application.yml`/`.properties` when present — not a findings pack, run
@@ -54,6 +54,58 @@ npx skills add elkouhen/ccc-radar-skill
 This installs the `cccr` skill (`skills/cccr/`) for your coding agent. It
 still requires the `cccr` CLI itself — see
 [Installation in `ccc-radar`](https://github.com/elkouhen/ccc-radar#installation).
+
+For a Java/Spring architecture audit, installation is not complete until the
+CLI can locate this skill's rule packs. Set the path explicitly, then use the
+preflight before indexing:
+
+```bash
+export CCCR_RULES_ROOT="/path/to/ccc-radar-skill/skills/cccr/rules"
+cccr init
+cccr doctor
+cccr index
+cccr analyze audit
+```
+
+`cccr doctor` distinguishes blocking audit prerequisites (Semgrep,
+configuration and REST/Kafka packs), the local-model readiness warning, and
+optional `ccc` code search.
+The full installation and troubleshooting sequence is in
+[`management.md`](skills/cccr/references/management.md).
+
+## MCP Server
+
+The `cccr` MCP server exposes the indexed architecture and findings to a coding
+agent. Initialize and index the target repository first, then start the agent
+from that repository: the server uses its working directory to locate
+`.cccr/config.yml` and `.cccr/findings.db`.
+
+For Codex, register the stdio server once:
+
+```bash
+codex mcp add cccr -- cccr mcp
+codex mcp get cccr
+```
+
+Restart Codex after registration. For Claude Code, add the following server
+configuration and restart the client:
+
+```json
+{"mcpServers": {"cccr": {"command": "cccr", "args": ["mcp"]}}}
+```
+
+Pi requires the community `pi-mcp-adapter` extension because MCP is not built
+in. Install it once, then create `.mcp.json` in the indexed repository:
+
+```bash
+pi install npm:pi-mcp-adapter
+```
+
+```json
+{"mcpServers": {"cccr": {"command": "cccr", "args": ["mcp"]}}}
+```
+
+Start Pi from that repository and use `/mcp` to inspect the connection.
 
 ## Related projects
 

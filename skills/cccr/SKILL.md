@@ -1,286 +1,164 @@
 ---
 name: cccr
-description: "This skill should be used for Java/Spring microservice audits with cccr: initializing the repo with the right Semgrep packs, indexing findings plus REST/Kafka endpoints, inspecting summary/endpoints/graph/findings, or running code search via ccc when needed. Trigger phrases include 'audit', 'microservice', 'Kafka', 'REST', 'cccr', 'Semgrep', 'finding', 'endpoint', 'graph', and 'search the codebase'."
+description: "Use this skill for Java/Spring architecture exploration with cccr: initialize and index a project, inspect microservices, Kafka topics, HTTP APIs, MongoDB collections and modules, analyze dependencies, audit Semgrep findings, export architecture graphs, or use semantic code search through ccc. Trigger phrases include 'audit', 'microservice', 'Kafka', 'REST', 'MongoDB', 'cccr', 'Semgrep', 'finding', 'architecture graph', and 'search the codebase'."
 ---
 
-> Adapted from cocoindex-code's own skill
-> ([`skills/ccc/SKILL.md`](https://github.com/cocoindex-io/cocoindex-code/blob/main/skills/ccc/SKILL.md),
-> Apache-2.0), renamed to `cccr` and extended to cover Semgrep findings.
+# cccr Architecture Explorer
 
-# cccr - Microservice Audit, Indexing & Findings
+`cccr` indexes a Java/Spring project into architecture objects and Semgrep
+findings. Use its object commands before retrieving code: they describe
+microservices, modules, HTTP APIs, Kafka topics, MongoDB collections, and the
+relationships between them. `ccc` (CocoIndex Code) is optional and only needed
+for semantic code search.
 
-`cccr` is the audit CLI layered on top of Semgrep and, for code search only,
-`ccc` (CocoIndex Code). For the target stack of this skill — **Java + Spring
-microservices (Maven or Gradle)** — it indexes:
+## Documentation Language
 
-- Semgrep findings (`cccr summary`, `cccr findings`)
-- REST and Kafka endpoints (`cccr endpoints`), including Spring MVC, Feign,
-  WebClient, Spring Cloud Gateway, and WebFlux router functions
-- dependencies between microservices derived from REST/Kafka endpoints
-  (`cccr graph`)
-- who produces/consumes a given topic or route, across services
-  (`cccr flow`)
-- code search results enriched with findings (`cccr search`, via `ccc`)
+Write and update user-facing documentation, generated report text, and examples
+in English. Preserve exact CLI output, source-code snippets, and user-provided
+text in their original language when quoting them.
 
 ## Ownership
 
-The agent owns the `cccr` lifecycle for the current project — initialization, indexing, and searching. Do not ask the user to perform these steps; handle them automatically.
+The agent owns the `cccr` lifecycle for the current project. Do not ask the
+user to initialize or index it manually.
 
-- **Initialization**: If `cccr search` or `cccr index` fails with an initialization error (e.g., "Not in an initialized project directory"), run `cccr init` from the project root directory (see **Default Rules** below for which `--rules` to pass), then `cccr index` to build the index, then retry the original command.
-- **Index freshness**: Keep the index up to date by running `cccr index` (or `cccr search --refresh`) when the index may be stale — e.g., at the start of a session, or after making significant code changes (new files, refactors, renamed modules). There is no need to re-index between consecutive searches if no code was changed in between.
-- **Installation**: If `cccr` itself is not found (command not found), refer to [management.md](references/management.md) for installation instructions and inform the user.
+- If an architecture command reports that the project is not initialized, run
+  `cccr init`, then `cccr index`, and retry the command.
+- Run `cccr index` after relevant source changes, renamed modules, or a major
+  refactor. There is no need to re-index between read-only queries.
+- Before drawing architectural conclusions, run `cccr doctor`. Missing REST or
+  Kafka packs invalidate the topology; missing `ccc` only disables `search`.
+- If `cccr` is unavailable, follow
+  [management.md](references/management.md).
 
-### Default Rules for Java Microservice Audits
+## Default Rules
 
-This skill bundles five Semgrep rule packs:
+This skill bundles five Java/Spring Semgrep packs:
 
-- `default` ([`rules/default/`](rules/default/)) — Java rules for bounded,
-  streaming-safe handling of files and Kafka events: bounded streaming for
-  files (`a-memoire-fichiers.yaml`, R1-R3) and Kafka claim-check/delivery
-  guarantees (`b-kafka.yaml`, R5-R10). The prose behind each rule ID
-  (including the design-only rules not enforced by a Semgrep pattern — R4,
-  R9, R11) lives in
-  [`rules/default/design-rules.md`](rules/default/design-rules.md), which
-  travels with the pack when copied into a target repo so the `reference:
-  design-rules.md#rN` in each rule's metadata keeps resolving.
-- `liveness` ([`rules/liveness/`](rules/liveness/)) — cross-cutting rules
-  for distributed-system blocking points in a REST + Kafka microservices
-  landscape: missing HTTP timeouts, blocking waits without a timeout, a
-  synchronous REST call
-  inside a Kafka consumer handler, and a network call held under a lock —
-  Java/Spring only (`java.yaml`: `RestTemplate`, `@KafkaListener`,
-  `synchronized`), matching the target stack (Java + Spring microservices).
-- `rest` ([`rules/rest/`](rules/rest/)) — REST endpoint inventory rules for
-  Spring controllers and `RestTemplate` client calls. These do **not** create
-  findings; they populate `cccr endpoints` / `cccr graph`.
-- `kafka` ([`rules/kafka/`](rules/kafka/)) — Kafka endpoint inventory rules
-  for `@KafkaListener`, `KafkaTemplate.send(...)`, and `ProducerRecord(...)`.
-  These also feed `cccr endpoints` / `cccr graph`, not the findings list.
-- `kafka-security` ([`rules/kafka-security/`](rules/kafka-security/)) —
-  Kafka security findings: SASL credentials hardcoded in source,
-  `security.protocol` set to `PLAINTEXT`, a `JsonDeserializer` trusting all
-  packages (arbitrary class instantiation from an untrusted message), and
-  raw Java deserialization (`ObjectInputStream.readObject`) — Java/Spring
-  only.
+- `default` - bounded file handling and Kafka delivery design checks.
+- `liveness` - HTTP timeouts, blocking waits, synchronous calls in consumers,
+  and network calls held under locks.
+- `rest` - HTTP API inventory; it feeds architecture indexing rather than the
+  findings list.
+- `kafka` - Kafka producer and consumer inventory; it feeds architecture
+  indexing rather than the findings list.
+- `kafka-security` - insecure Kafka settings and unsafe deserialization.
 
-Run all five packs **by default** on `cccr init`, unless the user
-explicitly asks for a different rule set:
-
-1. If `.cccr/config.yml` doesn't exist yet, copy the pack directories
-   (`rules/default/`, `rules/liveness/`, `rules/rest/`, `rules/kafka/`,
-   `rules/kafka-security/`) into the target repo (e.g.
-   `.cccr/rules/default/`, `.cccr/rules/liveness/`, `.cccr/rules/rest/`,
-   `.cccr/rules/kafka/`, `.cccr/rules/kafka-security/`) — never pass an
-   absolute path back into the skill's own directory, since Semgrep derives
-   rule identity from the `--config` path and an absolute path outside the
-   repo breaks reproducibility across machines/checkouts.
-2. Run `cccr init` with one `--rules` per copied file:
-   ```bash
-   cccr init \
-     --rules .cccr/rules/default/a-memoire-fichiers.yaml \
-     --rules .cccr/rules/default/b-kafka.yaml \
-     --rules .cccr/rules/liveness/java.yaml \
-     --rules .cccr/rules/rest/java.yaml \
-     --rules .cccr/rules/kafka/java.yaml \
-     --rules .cccr/rules/kafka-security/java.yaml
-   ```
-   This takes priority over `cccr init`'s own auto-detection (local
-   `.semgrep.yml`/`semgrep.yml`/`.semgrep`, or the `p/security-audit`
-   registry fallback) — explicit `--rules` always wins.
-3. If the user names additional or different rules, merge them in with more
-   `--rules` flags rather than dropping the default packs, unless the user
-   asks to replace them.
-4. If `.cccr/config.yml` already exists, leave it as-is (`cccr init` refuses
-   to overwrite it) — the default packs only apply to fresh initialization.
-
-## Audit Workflow
-
-For microservice audits, prefer the following sequence:
-
-1. `cccr summary` — quick posture: severity distribution and hot rules.
-2. `cccr endpoints` — inspect the static REST/Kafka inventory.
-3. `cccr graph` — surface the dependency topology between microservices from
-   indexed REST/Kafka endpoints before diving into individual findings. For a
-   monorepo containing several Maven or Gradle modules, indexing once at the parent
-   directory is enough: findings/endpoints are attributed to their module
-   automatically, and `cccr graph` (no flag needed) reports real cross-module
-   dependencies. Only use `--workspace <root>` when the services actually live
-   in **separate** repos indexed independently (see `cccr microservices`).
-4. `cccr flow <topic-or-route>` — once `graph` (or `endpoints`) surfaces a
-   topic or route of interest, trace every producer/consumer or
-   server/caller site for it, plus the findings that overlap each site.
-   Same module-attribution/`--workspace` behavior as `graph`. Prefer this
-   over grepping the codebase for a topic name by hand.
-5. `cccr findings <query>` — search vulnerabilities / technical debt by
-   description or rule.
-6. `cccr search <query>` — only when you need semantic code search; this is
-   the part that depends on `ccc`.
-
-Do not jump straight to `cccr search` for every audit question: `summary`,
-`endpoints`, `graph`, `flow`, and `findings` are cheaper and more directly
-aligned with architecture review.
-
-### Tracing a Flow (`cccr flow`)
-
-`cccr flow <query>` resolves `<query>` to a Kafka topic or REST route — exact
-name first, then an unambiguous case-insensitive substring — and lists every
-site for it (producers/consumers, or servers/callers) together with the
-Semgrep findings that overlap each site. A typical loop:
+For a fresh Java/Spring project, set `CCCR_RULES_ROOT` to this skill's
+`rules` directory, then initialize and verify the project:
 
 ```bash
-cccr flow orders.created                          # who produces/consumes this topic?
-cccr flow orders.created --workspace /path/to/root # same, across separately-indexed repos
+export CCCR_RULES_ROOT="/path/to/ccc-radar-skill/skills/cccr/rules"
+cccr init
+cccr doctor
+cccr index
 ```
 
-If the modules already share a single index (a monorepo indexed once at
-its root), `service` in the output already reflects each site's module or
-service attribution — no flag needed.
+`cccr init` copies the packs into the target project and records their source
+hashes, so the audit remains reproducible after this skill is upgraded. The
+command also enables the valid Semgrep registry rulesets `p/security-audit`,
+`p/java`, `p/owasp-top-ten`, and `p/secrets`. Do not add `p/spring`: it is not
+a valid Semgrep registry ruleset.
 
-Then read the sites, fix the issue, `cccr index` (or the `reindex_findings`
-MCP tool) to refresh, and re-run `cccr flow` to confirm the finding is gone.
-A query that matches no topic/route, or matches more than one ambiguously,
-exits with an explicit error (code 2) rather than guessing — try a more
-specific query, or use `cccr endpoints`/`cccr graph` first to find the exact
-topic/route name.
+If `.cccr/config.yml` already exists, do not overwrite it. Retain its explicit
+rules and add the required local packs when they are absent.
 
-## Searching the Codebase
+## Architecture Workflow
 
-To perform a semantic search:
+Start with the indexed architecture, then move toward source only when needed:
+
+1. `cccr microservices` - discover services and their main integrations.
+2. `cccr microservices show <name>` - understand one service without reading
+   configuration or source files.
+3. Explore its linked objects with `cccr microservices topics <name>`,
+   `cccr microservices apis <name>`, and `cccr microservices mongodb <name>`.
+4. Explore a shared object from the other direction with `cccr topics`,
+   `cccr apis`, or `cccr mongodb`.
+5. Use `cccr analyze audit` before manually interpreting a dense graph.
+6. Use `cccr analyze microservices impact <name>` or `path <source> <target>`
+   for impact and dependency-path questions.
+7. Use `cccr search <query>` only when the answer requires code semantics.
+
+The default output is intentionally concise and never dumps application files.
+Use `implementation`, `properties`, or `openapi` only when implementation or a
+contract is explicitly required.
+
+### Object Commands
+
+Each object family supports `list`, `show`, `neighbors`, and `search` where
+applicable. Navigate through relationships instead of file paths:
 
 ```bash
-cccr search <query terms>
+cccr microservices show order-service
+cccr microservices topics order-service
+cccr topics consumers orders.created
+cccr apis consumers 'POST /payments'
+cccr mongodb services orders
+cccr modules show shared-domain
+cccr modules graph
 ```
 
-The query should describe the concept, functionality, or behavior to find, not exact code syntax. For example:
+Use `cccr integrations` for a compact project-wide HTTP/Kafka inventory. Use
+`cccr graph` for the microservice interaction graph; it is distinct from
+module build dependencies.
+
+### Analysis and Exports
+
+```bash
+cccr analyze audit
+cccr analyze microservices calls order-service
+cccr analyze microservices dependencies order-service
+cccr analyze microservices impact order-service
+cccr analyze microservices path order-service payment-service
+cccr analyze microservices orphan-integrations
+
+cccr export microservices --drawio architecture.drawio
+cccr export microservices --html architecture.html
+cccr export microservices --c4 likec4-project
+cccr export modules --drawio module-dependencies.drawio
+cccr export modules --html module-dependencies.html
+```
+
+The microservice export covers HTTP, Kafka, and MongoDB relationships. The
+module export is a separate build-dependency view. Use `--workspace` only when
+the services live in separately indexed repositories.
+
+## Findings
+
+Use `cccr summary` for the broad Semgrep posture, then filter indexed findings
+with `cccr findings`:
+
+```bash
+cccr findings "missing HTTP timeout"
+cccr findings "hardcoded SASL credentials"
+cccr findings "CWE-89" --severity ERROR
+cccr findings "PLAINTEXT kafka security.protocol" --path 'app/*'
+```
+
+`cccr findings` uses a precision-first lexical query: all query terms must be
+present. Prefer an exact rule identifier or CWE when known. `--context`
+explicitly includes source context; otherwise findings remain a concise
+architecture-level view.
+
+## Code Search
+
+Use semantic search only after the architecture-level commands above, or when
+the question is specifically about implementation:
 
 ```bash
 cccr search database connection pooling
-cccr search user authentication flow
-cccr search error handling retry logic
-```
-
-### Filtering Results
-
-- **By language** (`--lang`, repeatable): restrict results to specific languages.
-
-  ```bash
-  cccr search --lang python --lang markdown database schema
-  ```
-
-- **By path** (`--path`): restrict results to a glob pattern relative to project root. If omitted, defaults to the current working directory (only results under that subdirectory are returned).
-
-  ```bash
-  cccr search --path 'src/api/*' request validation
-  ```
-
-### Pagination
-
-Results default to the first page. To retrieve additional results:
-
-```bash
+cccr search --lang java request validation
+cccr search --path 'src/main/java/**' retry handling
 cccr search --offset 5 --limit 5 database schema
 ```
 
-If all returned results look relevant, use `--offset` to fetch the next page — there are likely more useful matches beyond the first page.
+`--lang` accepts one language. `--path` is forwarded to `ccc`. Search results
+identify a file and range; inspect that source only when it is needed to answer
+the question.
 
-### Working with Search Results
+## References
 
-Search results include file paths and line ranges. To explore a result in more detail:
-
-- Use the editor's built-in file reading capabilities (e.g., the `Read` tool) to load the matched file and read lines around the returned range for full context.
-- When working in a terminal without a file-reading tool, use `sed -n '<start>,<end>p' <file>` to extract a specific line range.
-
-## Searching Findings
-
-`cccr search` (above) enriches code results with any Semgrep findings that
-overlap them. To search the indexed findings **on their own** — in natural
-language, without a code search — use `cccr findings` instead:
-
-```bash
-cccr findings <query terms>
-```
-
-Use this when the question is about a vulnerability, security issue, piece of
-technical debt, or a specific rule/finding, rather than about code semantics.
-
-### Relevant Query Patterns
-
-For the Java/Spring/Kafka audit scope of this skill, these are especially useful:
-
-```bash
-# broad vulnerability classes
-cccr findings "sql injection"
-cccr findings "command injection"
-cccr findings "unsafe yaml deserialization"
-cccr findings "weak random token generation"
-
-# Kafka / messaging security
-cccr findings "hardcoded SASL credentials"
-cccr findings "PLAINTEXT kafka security.protocol"
-cccr findings "JsonDeserializer trusted packages"
-cccr findings "Java deserialization from Kafka message"
-
-# liveness / distributed-system risks
-cccr findings "missing HTTP timeout"
-cccr findings "blocking wait without timeout"
-cccr findings "synchronous REST call inside Kafka consumer"
-cccr findings "network call under lock"
-
-# exact identifiers also work well
-cccr findings "CWE-89"
-cccr findings "custom.subprocess-shell-true"
-cccr findings "rules.kafka-security.java.spring.kafka.plaintext"
-```
-
-Start with a natural-language description of the risk. If you already know the
-finding family, prefer an exact `rule_id`, `CWE`, or a filtered query.
-
-### Filtering Results
-
-- **By severity** (`--severity`): keep only findings at or above this level (`INFO` / `WARNING` / `ERROR`).
-- **By rule** (`--rule`): keep only findings matching this exact `rule_id`.
-- **By path** (`--path`): restrict to a glob pattern, same style as `cccr search --path`.
-
-```bash
-cccr findings sql injection --severity ERROR --path 'app/*'
-```
-
-### Pagination and Output
-
-- `--limit` / `--offset` paginate results, same as `cccr search` (default limit 5).
-- `--context` adds 5 lines of surrounding code (before/after) to each finding, when the source file is still readable.
-- `--json` returns the stable `FindingHit` schema instead of the text render — this is also the shape returned by the MCP tool `search_findings`.
-
-### Aggregated View
-
-For a broad, low-cost overview instead of a targeted search (e.g. "what's our
-security posture", "any critical findings"), prefer:
-
-```bash
-cccr summary
-```
-
-This returns totals by severity, the top 10 rules by count, and counts by
-top-level directory — much cheaper than a full `cccr findings` search when the
-question isn't about a specific file, rule, or vulnerability class. Add
-`--json` for structured output (matches the MCP tool `findings_summary`).
-
-### Choosing the Right Tool
-
-Prefer the least expensive query that answers the question, escalating only
-as needed:
-
-1. **Architecture overview** — `cccr summary`, then `cccr endpoints`.
-2. **Microservice dependency overview** — `cccr graph`.
-3. **Natural-language findings lookup** — `cccr findings <query>`.
-4. **Code + findings** — `cccr search <query>` when the question is primarily about code semantics.
-
-If `.cccr/findings.db` doesn't exist yet, both `cccr findings` and `cccr summary` exit with `Index absent. Lancez d'abord: cccr index` (exit code 2) — run `cccr index` and retry, same as the index-freshness rule under Ownership above.
-
-## Settings
-
-To view or edit embedding model configuration, include/exclude patterns, or language overrides, see [settings.md](references/settings.md).
-
-## Management & Troubleshooting
-
-For installation, initialization, index refresh, troubleshooting, and cleanup commands, see [management.md](references/management.md).
+- [settings.md](references/settings.md): project configuration and `ccc`
+  settings.
+- [management.md](references/management.md): installation, initialization,
+  index refresh, and troubleshooting.
