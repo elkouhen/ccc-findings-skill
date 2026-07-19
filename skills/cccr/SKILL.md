@@ -139,9 +139,11 @@ cccr export modules --drawio module-dependencies.drawio
 cccr export modules --html module-dependencies.html
 ```
 
-The microservice export covers HTTP, Kafka, and MongoDB relationships. The
-module export is a separate build-dependency view. Use `--workspace` only when
-the services live in separately indexed repositories.
+The microservice export covers HTTP, Kafka, and MongoDB relationships. Its
+HTML view can independently filter internal microservices, external
+microservices, Kafka topics, and MongoDB collections. The module export is a
+separate build-dependency view. Use `--workspace` only when the services live
+in separately indexed repositories.
 
 ## Findings
 
