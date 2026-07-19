@@ -114,7 +114,7 @@ to physical topic `ABC_DEF_GHI_JKL`, replaces standard extraction at the covered
 source locations, and triggers a full refresh when the strategy changes. In a
 `Rest*Config*` class it also recognizes configured HTTP dependencies: uppercase
 domain constants name an indexed peer, while
-`restApiProperties().getRest().get("xxx")` adds `xxx` as an external
+`getRest().get("xxx")` adds `xxx` as an external
 microservice linked by HTTP. It is unavailable with `--engine cocoindex`.
 
 Use `cccr integrations` for a compact project-wide HTTP/Kafka inventory. Use
